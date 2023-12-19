@@ -1,8 +1,6 @@
-package com.lizana.clienteproducto.model;
+package com.lizana.clienteproducto.model.externooperacion;
 
 
-import com.lizana.clienteproducto.model.externoclient.ClientObject;
-import com.lizana.clienteproducto.model.externosaldo.SaldoDto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -13,7 +11,7 @@ import lombok.NoArgsConstructor;
 public class StatusResponse {
     private Integer code;
     private String description;
-    private OperacionDtoUx detail;
+    private OperacionDto detail;
 
 }
 

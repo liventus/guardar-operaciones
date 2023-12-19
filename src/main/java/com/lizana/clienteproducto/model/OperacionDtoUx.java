@@ -8,14 +8,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PerfilUser {
+public class OperacionDtoUx {
 
     private String id;
-    private String tipoDeDocumento;
-    private String numeroDeDocumento;
-    private String idDeProducto;
-    private Number titular;
-    private Number firmante;
+    private String IdSaldo;
+    private String tipoDeOperacion;
+    private Long monto;
 
 
 }
