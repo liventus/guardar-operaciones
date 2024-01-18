@@ -3,89 +3,74 @@ package com.lizana.clienteproducto.service.impl;
 import com.lizana.clienteproducto.model.DataTransfer;
 import com.lizana.clienteproducto.model.OperacionDtoUx;
 import com.lizana.clienteproducto.model.StatusResponse;
+import com.lizana.clienteproducto.model.externooperacion.OperacionDto;
 import com.lizana.clienteproducto.model.externosaldo.SaldoDto;
 import com.lizana.clienteproducto.service.GuardarOperacionesService;
 import com.lizana.clienteproducto.util.ServiceOperacionGuardar;
 import com.lizana.clienteproducto.util.ServiceProductoExtraer;
 import com.lizana.clienteproducto.util.ServiceSaldoExtraer;
-import io.reactivex.rxjava3.core.Maybe;
+import com.lizana.clienteproducto.util.ServiceSaldoGuardar;
+
+import org.apache.log4j.Logger;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
 
 @Service
 public class GuardarOperacionesServiceImpl implements GuardarOperacionesService {
 
+  private static final Logger logger = Logger.getLogger(GuardarOperacionesServiceImpl.class);
+
+
   @Override
-  public Maybe<StatusResponse> saveOperacion(OperacionDtoUx dto) {
-
-    //extraer la data de la tabla de saldo
-
-
-    return ServiceSaldoExtraer.extraerSaldo(dto.getIdSaldo())
-        .map(x -> validarSaldoResponse(x))
-        .flatMap(x -> ServiceProductoExtraer.serviceProductExtraerWc(x.getDetail()))
-        .map(x->validarRespuestaProducto(x))
-        .map(x-> metodoGrabar2(x));
+  public Mono<StatusResponse> saveOperacion(OperacionDtoUx dto) {
+    logger.info("GuardarOperacionesServiceImpl.class");
+    return ServiceSaldoExtraer.getSaldo(dto.getIdSaldo())
+        .map(this::validarSaldoResponse)
+        .flatMap(x -> ServiceProductoExtraer.getProduct(x.getDetail()))
+        .flatMap(x -> metodoGrabar2(x,dto));
 
   }
 
   private com.lizana.clienteproducto.model.externosaldo.StatusResponse
   validarSaldoResponse(com.lizana.clienteproducto.model.externosaldo.StatusResponse x) {
-
-    System.out.println(x);
-
-
+    logger.info("validarSaldoResponse.class: " + x);
     return x;
   }
+   private Mono<StatusResponse> metodoGrabar2(DataTransfer dataTransfer,OperacionDtoUx dto) {
+    logger.info("metodoGrabar2" );
+    SaldoDto newSaldoRequest = dataTransfer.getSaldoDtoResponse();
+    newSaldoRequest.setSaldo(dataTransfer.getSaldoDtoResponse().getSaldo().longValue()+dto.getMonto());
 
-  private DataTransfer
-  validarRespuestaProducto(DataTransfer x) {
-    System.out.println(x);
 
-    return x;
+    Mono<com.lizana.clienteproducto.model.externosaldo
+        .StatusResponse> maybeSaldo = ServiceSaldoGuardar
+        .saveSaldo(newSaldoRequest);
+    //aca fuarda saldo
+
+    OperacionDto newOperacion = new OperacionDto();
+
+    newOperacion.setIdSaldo(dataTransfer.getSaldoDtoResponse().getId());
+    newOperacion.setTipoDeOperacion(dto.getTipoDeOperacion());
+    newOperacion.setMonto(dto.getMonto());
+
+    Mono<com.lizana.clienteproducto.model.externooperacion
+        .StatusResponse> maybeOperacion = ServiceOperacionGuardar
+        .saveOperation(newOperacion);
+    return Mono.zip(maybeSaldo, maybeOperacion,
+        (valueCliente, valueProducto) -> validarGuardado(valueCliente, valueProducto));
   }
 
-  private Maybe<StatusResponse> metodoGrabar(DataTransfer valueProduct) {
+  private StatusResponse validarGuardado(com.lizana.clienteproducto.model.externosaldo
+                                     .StatusResponse valueCliente, com.lizana.clienteproducto
+                                     .model.externooperacion.StatusResponse valueProducto) {
+    System.out.println("validarGuardado");
 
+    StatusResponse statusResponse = new StatusResponse();
+    statusResponse.setCode(HttpStatus.CREATED.value());
+    statusResponse.setDescription(HttpStatus.CREATED.name());
 
-    SaldoDto saldoDto = new SaldoDto();
-    saldoDto.setProducto(valueProduct.getDetail().getIdDeProducto());
-    saldoDto.setFirmante(dto.getFirmante());
-    saldoDto.setTitular(dto.getTitular());
-    saldoDto.setSaldo(0);
-
-    Maybe<com.lizana.clienteproducto.model.externosaldo.StatusResponse> responseSaldo = ServiceOperacionGuardar.serviceProductWc(dto);
-
-
-    return responseSaldo
-        .map(statusResponse -> {
-          System.out.println(statusResponse.getCode());
-          System.out.println(statusResponse.getDescription());
-          System.out.println(statusResponse.getDetail().toString());
-          StatusResponse s = new StatusResponse();
-          s.setCode(statusResponse.getCode());
-          s.setDescription(statusResponse.getDescription());
-          s.setDetail(statusResponse.getDetail());
-          return s;
-        });
-  }
-
-  private StatusResponse metodoGrabar2(DataTransfer dataTransfer) {
-    //guardar saldo con nuevo saldo
-
-
-    Maybe<com.lizana.clienteproducto.model.externosaldo.StatusResponse> responseSaldo = ServiceOperacionGuardar.serviceProductWc(dto);
-    // guardar operacion
-
-    return responseSaldo
-        .map(statusResponse -> {
-          System.out.println(statusResponse.getCode());
-          System.out.println(statusResponse.getDescription());
-          System.out.println(statusResponse.getDetail().toString());
-          StatusResponse s = new StatusResponse();
-          s.setCode(statusResponse.getCode());
-          s.setDescription(statusResponse.getDescription());
-          s.setDetail(statusResponse.getDetail());
-          return s;
-        });
+    return statusResponse;
   }
 }

@@ -1,9 +1,14 @@
 package com.lizana.clienteproducto.util;
 
+
 import com.lizana.clienteproducto.model.externooperacion.OperacionDto;
+import com.lizana.clienteproducto.model.externosaldo.SaldoDto;
 import com.lizana.clienteproducto.model.externooperacion.StatusResponse;
-import hu.akarnokd.rxjava3.retrofit.RxJava3CallAdapterFactory;
-import io.reactivex.rxjava3.core.Maybe;
+
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.http.Body;
@@ -12,25 +17,19 @@ import retrofit2.http.POST;
 
 
 public class ServiceOperacionGuardar {
-    public interface ProductService {
-        @POST("/operations")
-        @Headers("Content-Type: application/json")
-        Maybe<StatusResponse> postProduct(@Body OperacionDto operacionDto);
+    public static Mono<StatusResponse> saveOperation(OperacionDto dto){
+        String url = "http://api-gateway:8080/operations";
+        WebClient.Builder builder = WebClient.builder();
 
-    }
+        return builder.build()
+            .post()
+            .uri(url)
+            .contentType(MediaType.APPLICATION_JSON)  // Especifica el tipo de contenido del cuerpo de la solicitud
+            .body(BodyInserters.fromValue(dto))       // Convierte el objeto a un cuerpo de solicitud
+            .retrieve()
+            .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                clientResponse -> Mono.error(new RuntimeException("Error en la solicitud: " + clientResponse.statusCode())))
+            .bodyToMono(com.lizana.clienteproducto.model.externooperacion.StatusResponse.class);
 
-    private static Retrofit getRetrofitInstance() {
-        return new Retrofit.Builder()
-                .baseUrl("http://localhost:8080")
-                .addConverterFactory(GsonConverterFactory.create())
-                .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
-                .build();
-    }
-
-    public static Maybe<StatusResponse> serviceProductWc(OperacionDto dto) {
-        Retrofit retrofit = getRetrofitInstance();
-        ProductService productService = retrofit.create(ProductService.class);
-
-        return productService.postProduct(dto);
     }
 }
